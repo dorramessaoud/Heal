@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin Dashboard & Statistics | Team Heal</title>
+  <link rel="stylesheet" href="styles.css">
+  <style>
+    .admin-badge {
+      background: #7c3aed;
+      color: white;
+      font-size: 0.72rem;
+      font-weight: 800;
+      padding: 0.2rem 0.55rem;
+      border-radius: 999px;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+    }
+    .pin-card {
+      max-width: 400px;
+      margin: 5rem auto;
+      background: white;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 2.2rem;
+      text-align: center;
+      box-shadow: var(--shadow-md);
+    }
+    .status-select {
+      font-size: 0.8rem;
+      font-weight: 700;
+      padding: 0.35rem 0.6rem;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      cursor: pointer;
+    }
+    .status-active { background: #fee2e2; color: #dc2626; border-color: #fca5a5; }
+    .status-in_progress { background: #fef3c7; color: #d97706; border-color: #fcd34d; }
+    .status-resolved { background: #dcfce7; color: #16a34a; border-color: #86efac; }
+
+    @media print {
+      header, .no-print, .action-bar-export { display: none !important; }
+      body { background: white; }
+      .summary-card, .data-table-container { border: 1px solid #333 !important; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- PIN Protection Gate -->
+  <div id="pinGate" class="pin-card">
+    <div style="font-size: 2.5rem; margin-bottom: 0.5rem;">🔐</div>
+    <h2 style="font-size: 1.4rem; font-weight: 800; color: var(--secondary); margin-bottom: 0.3rem;">
+      Team Heal Admin Portal
+    </h2>
+    <p style="font-size: 0.88rem; color: var(--text-muted); margin-bottom: 1.5rem;">
+      Private dashboard for Dorra & Team Heal (Class 2A27) to analyze student data and manage campus barriers.
+    </p>
+
+    <form id="pinForm">
+      <div class="form-group">
+        <label class="form-label" for="pinInput">Enter Team Access PIN</label>
+        <input 
+          type="password" 
+          id="pinInput" 
+          class="form-input" 
+          placeholder="Class PIN (Hint: 2A27)" 
+          style="text-align: center; font-size: 1.2rem; letter-spacing: 3px;" 
+          required
+        >
+      </div>
+      <button type="submit" class="btn-submit" style="background:#7c3aed;">
+        Unlock Admin Dashboard
+      </button>
+      <p id="pinError" style="color:var(--accent); font-size:0.8rem; margin-top:0.6rem; display:none;">
+        Incorrect PIN. Please try again.
+      </p>
+    </form>
+  </div>
+
+  <!-- Protected Admin Content -->
+  <div id="adminContent" style="display: none;">
+    <!-- Navigation -->
+    <header class="no-print">
+      <div class="nav-bar">
+        <div class="brand">
+          <span class="admin-badge">Admin Portal</span>
+          <span class="brand-title">Team Heal — Executive Statistics</span>
+        </div>
+        <div style="display:flex; align-items:center; gap:0.8rem;">
+          <a href="/" target="_blank" class="nav-btn" style="color:var(--primary); font-weight:700;">
+            <span>↗ Student Public View</span>
+          </a>
+          <button id="lockBtn" class="nav-btn" style="border:1px solid var(--border); font-size:0.8rem;">
+            <span>🔒 Lock</span>
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <!-- Executive Header -->
+    <div class="stats-header-bar">
+      <div class="container">
+        <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:1rem;">
+          <div>
+            <span class="hero-tagline" style="background:#ede9fe; color:#7c3aed; margin-bottom:0.4rem;">
+              Internal Administrative View
+            </span>
+            <h1 style="font-size: 1.85rem; font-weight: 850; color: var(--secondary);">
+              Campus Barrier Impact & Live Statistics
+            </h1>
+            <p style="color: var(--text-muted); font-size: 0.92rem; margin-top: 0.2rem;">
+              Live numbers, student reports, and verified testimonies compiled for university leadership.
+            </p>
+          </div>
+
+          <div class="action-bar-export no-print">
+            <button id="refreshBtn" class="btn-export">
+              <span>🔄 Refresh Data</span>
+            </button>
+            <a href="/api/export-csv" class="btn-export">
+              <span>📥 Export CSV</span>
+            </a>
+            <button onclick="window.print()" class="btn-export">
+              <span>🖨️ Print / Save PDF</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Main Dashboard -->
+    <main class="container">
+      <!-- KPI Row -->
+      <div class="stats-grid-summary">
+        <div class="summary-card">
+          <div class="summary-label">Total Student Reports</div>
+          <div class="summary-val highlight-primary" id="kpiReports">...</div>
+          <div class="summary-note">Total 1-click taps across all spots</div>
+        </div>
+
+        <div class="summary-card">
+          <div class="summary-label">Student Testimonials</div>
+          <div class="summary-val" id="kpiStories" style="color:#7c3aed;">...</div>
+          <div class="summary-note">Personal stories submitted</div>
+        </div>
+
+        <div class="summary-card">
+          <div class="summary-label">Active Campus Barriers</div>
+          <div class="summary-val highlight-primary" id="kpiActiveBarriers">...</div>
+          <div class="summary-note">Total accessibility obstacles tracked</div>
+        </div>
+
+        <div class="summary-card">
+          <div class="summary-label">Live Inaction / Unresolved Rate</div>
+          <div class="summary-val highlight-accent" id="kpiUnresolvedRate">0%</div>
+          <div class="summary-note" id="kpiUnresolvedNote">No active reports pending fix</div>
+        </div>
+      </div>
+
+      <!-- Problem Ranking & Status Management -->
+      <div class="section-header">
+        <div>
+          <h2 class="section-title">🛠️ Barrier Ranking & Status Management</h2>
+          <p class="section-subtitle">Change status as you report these to campus administration.</p>
+        </div>
+      </div>
+
+      <div class="data-table-container">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Barrier Title</th>
+              <th>Category</th>
+              <th style="text-align: right;">Affected Reports</th>
+              <th style="text-align: right;">Days Unresolved</th>
+              <th>Current Status (Editable)</th>
+            </tr>
+          </thead>
+          <tbody id="adminBarrierTableBody">
+            <tr>
+              <td colspan="6" style="text-align:center; padding:1.5rem;">Loading barrier records...</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Category Breakdown -->
+      <div class="section-header">
+        <div>
+          <h2 class="section-title">📊 Category Breakdown</h2>
+          <p class="section-subtitle">Volume of complaints by barrier category.</p>
+        </div>
+      </div>
+
+      <div id="adminCategoryCards" style="display:grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1rem; margin-bottom: 2rem;">
+        <!-- Populated via JS -->
+      </div>
+
+      <!-- Testimonials / Stories Moderation Table -->
+      <div class="section-header">
+        <div>
+          <h2 class="section-title">💬 Student Stories & Feedback Log</h2>
+          <p class="section-subtitle">Real experiences to present during meetings with administration.</p>
+        </div>
+      </div>
+
+      <div class="data-table-container">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Student</th>
+              <th>Barrier</th>
+              <th>Impact Tag</th>
+              <th>Student Testimony</th>
+              <th class="no-print">Action</th>
+            </tr>
+          </thead>
+          <tbody id="adminStoriesTableBody">
+            <tr>
+              <td colspan="6" style="text-align:center; padding:1.5rem;">Loading stories...</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </main>
+
+    <footer class="no-print">
+      <div class="container">
+        <p class="footer-team">Sport FOR ALL 3.0 — Team Heal (Class 2A27)</p>
+        <p>Private Admin View • Lead: Dorra Messaoud</p>
+      </div>
+    </footer>
+  </div>
+
+  <script src="admin.js"></script>
+</body>
+</html>

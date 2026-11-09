@@ -1,0 +1,18 @@
+{
+  "name": "heal-barrier-website",
+  "version": "1.0.0",
+  "description": "Campus Accessibility Barrier Map and Administrative Statistics for Team Heal (Class 2A27)",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "keywords": [
+    "accessibility",
+    "campus",
+    "barrier-map",
+    "heal"
+  ],
+  "author": "Team Heal (Class 2A27)",
+  "license": "MIT"
+}
