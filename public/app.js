@@ -1,5 +1,5 @@
 // Heal - Scan the Barrier Website Client App
-// Handling 1-click counter, story sharing, and dynamic barrier additions
+// Modern UI: Deep Indigo, Mint Emerald Green +1 button, Coral Accents
 
 document.addEventListener('DOMContentLoaded', () => {
   // Elements
@@ -12,8 +12,8 @@ document.addEventListener('DOMContentLoaded', () => {
   const storyModal = document.getElementById('storyModal');
   const closeStoryModal = document.getElementById('closeStoryModal');
   const storyForm = document.getElementById('storyForm');
-  const storyProblemId = document.getElementById('storyProblemId');
-  const storyProblemTitleDisplay = document.getElementById('storyProblemTitleDisplay');
+  const storyProblemSelect = document.getElementById('storyProblemSelect');
+  const openGeneralStoryBtn = document.getElementById('openGeneralStoryBtn');
 
   // Add Problem Modal Elements
   const addProblemModal = document.getElementById('addProblemModal');
@@ -67,7 +67,7 @@ document.addEventListener('DOMContentLoaded', () => {
     } catch (err) {
       console.error('Failed to load problems:', err);
       problemsContainer.innerHTML = `
-        <div style="grid-column: 1/-1; text-align: center; color: var(--accent); padding: 2rem;">
+        <div style="grid-column: 1/-1; text-align: center; color: var(--coral); padding: 2rem;">
           Unable to connect to the campus barrier database. Please refresh.
         </div>
       `;
@@ -83,21 +83,23 @@ document.addEventListener('DOMContentLoaded', () => {
     if (totalStoriesTicker) totalStoriesTicker.textContent = totalStories;
   }
 
-  // Render Problems Cards
+  // Render Problems Cards matching modern mockup
   function renderProblems(problems) {
     if (!problemsContainer) return;
     const reportedMap = getReportedMap();
 
     problemsContainer.innerHTML = problems.map(p => {
       const isReported = (p.report_count > 0) && !!reportedMap[p.id];
-      const isCore = p.is_core === 1;
 
       return `
-        <article class="problem-card ${isCore ? 'is-core' : ''}" data-id="${p.id}">
+        <article class="problem-card" data-id="${p.id}">
           <div>
             <div class="card-top">
               <span class="card-icon">${p.icon || '⚠️'}</span>
-              <span class="card-category">${escapeHTML(p.category)}</span>
+              <span class="card-live-tag">
+                <span class="dot"></span>
+                <span>LIVE</span>
+              </span>
             </div>
 
             <h3 class="problem-title">${escapeHTML(p.title)}</h3>
@@ -106,7 +108,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
           <div>
             <div class="impact-counter">
-              <span>Affected Students:</span>
+              <span>Student Count:</span>
               <span class="counter-value" id="counter-${p.id}">${p.report_count}</span>
             </div>
 
@@ -117,11 +119,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 id="btn-report-${p.id}"
                 title="Tap to count your voice without writing anything"
               >
-                <span>${isReported ? '✓ Counted' : '✋ I have this problem (+1)'}</span>
-              </button>
-
-              <button class="btn-story" data-id="${p.id}" data-title="${escapeHTML(p.title)}">
-                <span>💬 Share what happened</span>
+                <span>${isReported ? '✓ Counted (+1)' : '+1 My Voice'}</span>
               </button>
             </div>
           </div>
@@ -134,15 +132,6 @@ document.addEventListener('DOMContentLoaded', () => {
       btn.addEventListener('click', async (e) => {
         const id = btn.getAttribute('data-id');
         await handleOneClickReport(id, btn);
-      });
-    });
-
-    // Attach Click Handlers for Story Button
-    document.querySelectorAll('.btn-story').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const id = btn.getAttribute('data-id');
-        const title = btn.getAttribute('data-title');
-        openStoryModalFor(id, title);
       });
     });
 
@@ -159,8 +148,8 @@ document.addEventListener('DOMContentLoaded', () => {
           if (card) {
             card.scrollIntoView({ behavior: 'smooth', block: 'center' });
             card.style.outline = '4px solid var(--primary)';
-            card.style.boxShadow = 'var(--shadow-lg)';
-            showToast(`📍 Scanned spot: ${targetProblem.title}. Tap below to count your report!`, '📲');
+            card.style.boxShadow = 'var(--shadow-card)';
+            showToast(`📍 Scanned spot: ${targetProblem.title}. Tap below to count your voice!`, '📲');
           }
         }
       }, 400);
@@ -170,7 +159,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // Handle Instant 1-Click Report
   async function handleOneClickReport(problemId, buttonEl) {
     const counterEl = document.getElementById(`counter-${problemId}`);
-    const originalText = counterEl ? counterEl.textContent : '';
+    const originalText = counterEl ? counterEl.textContent : '0';
 
     // Optimistic UI update
     if (counterEl) {
@@ -208,12 +197,23 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  // Open Story Modal
-  function openStoryModalFor(id, title) {
-    storyProblemId.value = id;
-    storyProblemTitleDisplay.value = title;
-    storyModal.classList.add('active');
-    document.getElementById('storyText').focus();
+  // Populate Story Select Dropdown
+  function populateStorySelect(defaultId) {
+    if (!storyProblemSelect) return;
+    storyProblemSelect.innerHTML = problemsList.map(p => `
+      <option value="${p.id}" ${p.id == defaultId ? 'selected' : ''}>
+        ${p.icon || '⚠️'} ${p.title}
+      </option>
+    `).join('');
+  }
+
+  // Open Story Modal from bottom pill
+  if (openGeneralStoryBtn) {
+    openGeneralStoryBtn.addEventListener('click', () => {
+      populateStorySelect(problemsList[0] ? problemsList[0].id : 1);
+      storyModal.classList.add('active');
+      document.getElementById('storyText').focus();
+    });
   }
 
   // Close Story Modal
@@ -228,7 +228,7 @@ document.addEventListener('DOMContentLoaded', () => {
   if (storyForm) {
     storyForm.addEventListener('submit', async (e) => {
       e.preventDefault();
-      const problemId = storyProblemId.value;
+      const problemId = storyProblemSelect.value;
       const text = document.getElementById('storyText').value;
       const impact = document.getElementById('storyImpactTag').value;
       const author = document.getElementById('storyAuthor').value;
@@ -301,8 +301,8 @@ document.addEventListener('DOMContentLoaded', () => {
           const newCard = document.querySelector(`[data-id="${data.problem.id}"]`);
           if (newCard) {
             newCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            newCard.style.boxShadow = '0 0 0 3px var(--primary)';
-            setTimeout(() => { newCard.style.boxShadow = ''; }, 2000);
+            newCard.style.outline = '4px solid var(--primary)';
+            setTimeout(() => { newCard.style.outline = ''; }, 2000);
           }
         } else {
           alert(data.error || 'Could not add problem');

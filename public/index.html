@@ -3,21 +3,21 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Scan the Barrier | Campus Accessibility Campaign</title>
+  <title>Scan the Barrier | Campus Accessibility</title>
   <link rel="stylesheet" href="styles.css">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🛗</text></svg>">
 </head>
 <body>
 
-  <!-- Navigation (Student Facing Only) -->
+  <!-- Navigation -->
   <header>
     <div class="nav-bar">
       <a href="/" class="brand">
         <span class="brand-badge">Team Heal</span>
         <span class="brand-title">Scan the Barrier</span>
       </a>
-      <span style="font-size: 0.85rem; color: var(--text-muted); font-weight: 600;">
-        Campus Student Portal
+      <span class="nav-tagline">
+        Campus Student Voice
       </span>
     </div>
   </header>
@@ -25,72 +25,58 @@
   <!-- Hero Section -->
   <section class="hero">
     <div class="container">
-      <span class="hero-tagline">Campaign: Scan the Barrier</span>
-      <h1>Scan it. See it. Can't ignore it.</h1>
-      <p class="hero-slogan">Real-Time Student Accessibility Voice</p>
-      <p>
-        Encountering a barrier on campus? <strong>You don't need to fill out a long form.</strong> 
-        Simply tap the problem below to record your experience. Every single tap updates our live database to demand real administrative action.
-      </p>
+      <div class="hero-pill-badge">
+        <span class="live-pulse-dot"></span>
+        <span>⚡ Live Student Voice</span>
+      </div>
+
+      <h1>
+        Scan it. See it.<br>
+        <span>Can't ignore it.</span>
+      </h1>
 
       <div class="campus-ticker">
         <div class="ticker-item">
-          <span>Total Student Reports:</span>
-          <span class="ticker-num" id="totalReportsTicker">...</span>
+          <span>Student Reports:</span>
+          <span class="ticker-num" id="totalReportsTicker">0</span>
         </div>
         <div class="ticker-item">
           <span>•</span>
         </div>
         <div class="ticker-item">
-          <span>Student Stories:</span>
-          <span class="ticker-num" id="totalStoriesTicker">...</span>
+          <span>Stories Shared:</span>
+          <span class="ticker-num" id="totalStoriesTicker">0</span>
         </div>
       </div>
     </div>
   </section>
 
-  <!-- Main Content -->
+  <!-- Main Floating Content -->
   <main class="container">
-
-    <!-- The 3 Core Problems Header -->
-    <div class="section-header">
-      <div>
-        <h2 class="section-title">🚨 Key Campus Accessibility Barriers</h2>
-        <p class="section-subtitle">Identified by our Sprint 1 survey data & campus observations. Tap to add your count instantly.</p>
-      </div>
-    </div>
 
     <!-- Problems Cards Grid -->
     <div class="problems-grid" id="problemsContainer">
-      <!-- Dynamically Populated with the 3 main problems + community added problems -->
-      <div style="text-align:center; padding: 2rem; color: var(--text-muted); grid-column: 1/-1;">
+      <div style="text-align:center; padding: 2.5rem; color: var(--text-muted); grid-column: 1/-1;">
         Loading active campus barriers...
       </div>
     </div>
 
-    <!-- Add Another Problem Section -->
-    <div class="add-problem-bar">
-      <div>
-        <h3 style="font-size: 1.15rem; font-weight: 750; color: var(--secondary); margin-bottom: 0.3rem;">
-          Facing a different barrier on campus?
-        </h3>
-        <p style="font-size: 0.88rem; color: var(--text-muted); max-width: 520px; margin: 0 auto;">
-          Whether it is inaccessible doors, poor acoustic/lighting environments, broken ramps, or restroom access — add it to the map so fellow students can support it.
-        </p>
-      </div>
-      <button class="btn-add-problem" id="openAddProblemBtn">
+    <!-- Centered Action Pills Bar -->
+    <div class="action-pills-bar">
+      <button class="btn-pill" id="openGeneralStoryBtn">
+        <span>💬</span>
+        <span>Share What Happened</span>
+      </button>
+      <button class="btn-pill btn-pill-primary" id="openAddProblemBtn">
         <span>➕</span>
-        <span>Add Another Problem</span>
+        <span>Add Another Barrier</span>
       </button>
     </div>
 
     <!-- Student Stories Section -->
     <section class="stories-section">
       <div class="section-header">
-        <div>
-          <h2 class="section-title">💬 Student Voices & Real Experiences</h2>
-          <p class="section-subtitle">Anonymized feedback and stories from affected students across our campus.</p>
-        </div>
+        <h2 class="section-title">💬 Student Voices & Stories</h2>
       </div>
 
       <div class="stories-grid" id="storiesContainer">
@@ -106,36 +92,32 @@
     <div class="modal-card">
       <button class="modal-close" id="closeStoryModal">&times;</button>
       <h3 class="modal-title">Share What Happened</h3>
-      <p class="modal-desc" id="storyModalSubtitle">
-        Your story will be kept completely anonymous and used to show university leadership why change is needed.
+      <p class="modal-desc">
+        Your story will be kept completely anonymous to highlight student realities to campus leadership.
       </p>
 
       <form id="storyForm">
-        <input type="hidden" id="storyProblemId" name="problem_id">
-
         <div class="form-group">
-          <label class="form-label">Related Barrier</label>
-          <input type="text" class="form-input" id="storyProblemTitleDisplay" readonly style="background:#f1f5f9; font-weight:600;">
+          <label class="form-label" for="storyProblemSelect">Which barrier did you experience?</label>
+          <select class="form-select" id="storyProblemSelect" required></select>
         </div>
 
         <div class="form-group">
-          <label class="form-label" for="storyText">What happened? How did it impact your day?</label>
+          <label class="form-label" for="storyText">What happened? How did it affect you?</label>
           <textarea 
             class="form-textarea" 
             id="storyText" 
-            placeholder="e.g., I had to walk up four flights of stairs on an injured knee because the elevator was out, and I had to leave campus early from pain..." 
+            placeholder="e.g., The elevator was out and I had to walk up four flights on crutches, leaving me in severe pain for the rest of the day..." 
             required></textarea>
-          <div class="form-help">Keep it honest and respectful. Details like building names or missed classes help immensely.</div>
         </div>
 
         <div class="form-group">
-          <label class="form-label" for="storyImpactTag">Primary Impact Area</label>
+          <label class="form-label" for="storyImpactTag">Impact Area</label>
           <select class="form-select" id="storyImpactTag">
             <option value="Physical Pain / Fatigue">Physical Pain / Fatigue</option>
             <option value="Mobility Barrier">Mobility Barrier</option>
-            <option value="Missed Class / Hurt Grades">Missed Class / Hurt Grades</option>
-            <option value="Sensory Overload / ADHD Strain">Sensory Overload / ADHD Strain</option>
-            <option value="Administrative Lack of Response">Administrative Lack of Response</option>
+            <option value="Missed Class / Hurt Attendance">Missed Class / Hurt Attendance</option>
+            <option value="Sensory Overload / Focus Strain">Sensory Overload / Focus Strain</option>
             <option value="General Discomfort">General Discomfort</option>
           </select>
         </div>
@@ -150,19 +132,19 @@
     </div>
   </div>
 
-  <!-- Modal: Add Another Problem -->
+  <!-- Modal: Add Another Barrier -->
   <div class="modal-overlay" id="addProblemModal">
     <div class="modal-card">
       <button class="modal-close" id="closeAddProblemModal">&times;</button>
       <h3 class="modal-title">Add Another Barrier</h3>
       <p class="modal-desc">
-        Help highlight physical, structural, or pedagogical barriers not covered above.
+        Flag a structural or accessibility obstacle on campus not listed above.
       </p>
 
       <form id="addProblemForm">
         <div class="form-group">
-          <label class="form-label" for="newProblemTitle">Problem Title *</label>
-          <input type="text" class="form-input" id="newProblemTitle" placeholder="e.g., Heavy Classroom Fire Doors" required>
+          <label class="form-label" for="newProblemTitle">Barrier Title *</label>
+          <input type="text" class="form-input" id="newProblemTitle" placeholder="e.g., Heavy Auditorium Fire Doors" required>
         </div>
 
         <div class="form-group">
@@ -177,10 +159,10 @@
         </div>
 
         <div class="form-group">
-          <label class="form-label" for="newProblemIcon">Choose an Icon Emoji</label>
+          <label class="form-label" for="newProblemIcon">Icon Emoji</label>
           <select class="form-select" id="newProblemIcon">
             <option value="🚪">🚪 Heavy Doors / Entrances</option>
-            <option value="🔊">🔊 Noise / Acoustic Glare</option>
+            <option value="🔊">🔊 Noise / Acoustic Strain</option>
             <option value="🚻">🚻 Inaccessible Restroom</option>
             <option value="💡">💡 Flickering / Glare Lighting</option>
             <option value="🪜">🪜 Steep / Unsigned Stairs</option>
@@ -190,7 +172,7 @@
 
         <div class="form-group">
           <label class="form-label" for="newProblemDesc">Brief Explanation</label>
-          <textarea class="form-textarea" id="newProblemDesc" placeholder="Describe where this happens and why it is a barrier for students..." rows="3"></textarea>
+          <textarea class="form-textarea" id="newProblemDesc" placeholder="Describe where it is and how it affects students..." rows="3"></textarea>
         </div>
 
         <button type="submit" class="btn-submit">Add to Barrier Map (+1 My Report)</button>
@@ -207,7 +189,7 @@
   <!-- Footer -->
   <footer>
     <div class="container">
-      <p class="footer-team">Sport FOR ALL 3.0 — Team Heal (Class 2A27)</p>
+      <p class="footer-team">Team Heal (Class 2A27)</p>
       <p>Dorra Messaoud • Nour Gharbia • Ali Ben Kadhi • Amira Zouari • Riahi Seddik</p>
       <p style="margin-top: 0.6rem; font-size: 0.78rem;">
         "Scan the Barrier" Campaign • Powered by anonymous student participation.

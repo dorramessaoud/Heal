@@ -5,7 +5,7 @@ const url = require('node:url');
 const db = require('./db.js');
 
 const PORT = process.env.PORT || 3000;
-const PUBLIC_DIR = path.join(__dirname, 'public');
+const PUBLIC_DIR = fs.existsSync(path.join(__dirname, 'public')) ? path.join(__dirname, 'public') : __dirname;
 
 // MIME types for static assets
 const MIME_TYPES = {

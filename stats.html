@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Administration Statistics Dashboard | Scan the Barrier</title>
+  <link rel="stylesheet" href="styles.css">
+  <style>
+    @media print {
+      header, .action-bar-export, footer, .no-print {
+        display: none !important;
+      }
+      body {
+        background: white;
+        color: black;
+      }
+      .summary-card, .data-table-container {
+        border: 1px solid #333 !important;
+        box-shadow: none !important;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Navigation -->
+  <header class="no-print">
+    <div class="nav-bar">
+      <a href="/" class="brand">
+        <span class="brand-badge">Sprint 2</span>
+        <span class="brand-title">Team Heal</span>
+      </a>
+      <nav class="nav-links">
+        <a href="/" class="nav-btn">📍 Campus Barriers</a>
+        <a href="/stats" class="nav-btn active">📊 Administration Stats</a>
+      </nav>
+    </div>
+  </header>
+
+  <!-- Executive Header -->
+  <div class="stats-header-bar">
+    <div class="container">
+      <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:1rem;">
+        <div>
+          <span class="hero-tagline" style="margin-bottom:0.4rem;">Official Campus Accessibility Briefing</span>
+          <h1 style="font-size: 1.85rem; font-weight: 850; color: var(--secondary);">
+            Campus Barrier Impact & Resolution Statistics
+          </h1>
+          <p style="color: var(--text-muted); font-size: 0.92rem; margin-top: 0.2rem;">
+            Prepared by Team Heal (Class 2A27) for University Administration & Student Affairs. Real-time data compiled from live QR scans and verified student submissions.
+          </p>
+        </div>
+
+        <div class="action-bar-export no-print">
+          <a href="/api/export-csv" class="btn-export">
+            <span>📥 Export to CSV</span>
+          </a>
+          <button onclick="window.print()" class="btn-export">
+            <span>🖨️ Print / Save PDF</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Dashboard Body -->
+  <main class="container">
+
+    <!-- KPI Summary Row -->
+    <div class="stats-grid-summary">
+      <div class="summary-card">
+        <div class="summary-label">Total Affected Reports Logged</div>
+        <div class="summary-val highlight-primary" id="kpiTotalReports">...</div>
+        <div class="summary-note">Total verified 1-click reports by students</div>
+      </div>
+
+      <div class="summary-card">
+        <div class="summary-label">Student Avoidance Rate</div>
+        <div class="summary-val highlight-accent" id="kpiAvoidance">92%</div>
+        <div class="summary-note">Students forced to avoid spaces/activities</div>
+      </div>
+
+      <div class="summary-card">
+        <div class="summary-label">Historical Resolution Failure</div>
+        <div class="summary-val highlight-accent" id="kpiFailureRate">92.3%</div>
+        <div class="summary-note">Only 1 of 13 official complaints resolved</div>
+      </div>
+
+      <div class="summary-card">
+        <div class="summary-label">Active Documented Barriers</div>
+        <div class="summary-val" id="kpiActiveBarriers">...</div>
+        <div class="summary-note">Tracked physical & procedural obstacles</div>
+      </div>
+    </div>
+
+    <!-- Barrier Ranking & Impact Table -->
+    <div class="section-header">
+      <div>
+        <h2 class="section-title">📊 Problem Ranking by Student Volume</h2>
+        <p class="section-subtitle">Comparing student reports and total duration unresolved across campus.</p>
+      </div>
+    </div>
+
+    <div class="data-table-container">
+      <table class="data-table" id="barrierTable">
+        <thead>
+          <tr>
+            <th style="width: 40px;">#</th>
+            <th>Barrier Name</th>
+            <th>Category</th>
+            <th>Impact Share</th>
+            <th style="text-align: right;">Affected Students</th>
+            <th style="text-align: right;">Days Unresolved</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody id="barrierTableBody">
+          <tr>
+            <td colspan="7" style="text-align:center; padding: 2rem; color: var(--text-muted);">
+              Compiling live database records...
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Category Breakdown Summary -->
+    <div class="section-header">
+      <div>
+        <h2 class="section-title">📂 Category Breakdown</h2>
+        <p class="section-subtitle">Distribution of accessibility complaints by barrier type.</p>
+      </div>
+    </div>
+
+    <div id="categoryCardsContainer" style="display:grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1rem; margin-bottom: 2.5rem;">
+      <!-- Populated via stats.js -->
+    </div>
+
+    <!-- Qualitative Evidence: Student Testimonials -->
+    <div class="section-header">
+      <div>
+        <h2 class="section-title">📋 Qualitative Evidence & Student Testimonials</h2>
+        <p class="section-subtitle">Real experiences shared directly by affected students to show personal and academic impact.</p>
+      </div>
+    </div>
+
+    <div class="data-table-container">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Student / Role</th>
+            <th>Related Barrier</th>
+            <th>Impact Category</th>
+            <th>Student Quote / Experience</th>
+          </tr>
+        </thead>
+        <tbody id="storiesTableBody">
+          <tr>
+            <td colspan="5" style="text-align:center; padding: 1.5rem; color: var(--text-muted);">
+              Loading qualitative records...
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+  </main>
+
+  <!-- Footer -->
+  <footer class="no-print">
+    <div class="container">
+      <p class="footer-team">Team Heal (Class 2A27)</p>
+      <p>Official Campaign Dashboard • Generated for Academic & Facilities Review</p>
+    </div>
+  </footer>
+
+  <script src="stats.js"></script>
+</body>
+</html>
