@@ -2,7 +2,7 @@ const http = require('node:http');
 const fs = require('node:fs');
 const path = require('node:path');
 const url = require('node:url');
-const db = require('./db.js');
+const { pool, initDB } = require('./db.js');
 
 const PORT = process.env.PORT || 3000;
 const PUBLIC_DIR = fs.existsSync(path.join(__dirname, 'public')) ? path.join(__dirname, 'public') : __dirname;
@@ -25,7 +25,7 @@ function sendJSON(res, statusCode, data) {
   res.writeHead(statusCode, {
     'Content-Type': 'application/json; charset=utf-8',
     'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+    'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type',
     'Cache-Control': 'no-store, no-cache, must-revalidate'
   });
@@ -38,7 +38,7 @@ function parseBody(req) {
     let body = '';
     req.on('data', chunk => {
       body += chunk.toString();
-      if (body.length > 1e6) { // 1MB limit
+      if (body.length > 1e6) {
         req.destroy();
         reject(new Error('Payload too large'));
       }
@@ -63,7 +63,7 @@ const server = http.createServer(async (req, res) => {
   if (method === 'OPTIONS') {
     res.writeHead(204, {
       'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+      'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS',
       'Access-Control-Allow-Headers': 'Content-Type'
     });
     return res.end();
@@ -76,8 +76,8 @@ const server = http.createServer(async (req, res) => {
   // GET /api/problems - List all problems with counts and stats
   if (method === 'GET' && pathname === '/api/problems') {
     try {
-      const stmt = db.prepare(`
-        SELECT 
+      const { rows: problems } = await pool.query(`
+        SELECT
           p.id,
           p.slug,
           p.title,
@@ -90,9 +90,9 @@ const server = http.createServer(async (req, res) => {
           COUNT(DISTINCT r.id) AS report_count,
           COUNT(DISTINCT s.id) AS story_count,
           MIN(r.created_at) AS first_reported_at,
-          CASE 
+          CASE
             WHEN COUNT(DISTINCT r.id) = 0 THEN 0
-            ELSE MAX(1, CAST((julianday('now') - julianday(MIN(r.created_at))) AS INTEGER) + 1)
+            ELSE GREATEST(1, EXTRACT(DAY FROM NOW() - MIN(r.created_at))::INTEGER + 1)
           END AS days_active
         FROM problems p
         LEFT JOIN reports r ON p.id = r.problem_id
@@ -100,7 +100,6 @@ const server = http.createServer(async (req, res) => {
         GROUP BY p.id
         ORDER BY p.is_core DESC, report_count DESC
       `);
-      const problems = stmt.all();
       return sendJSON(res, 200, { success: true, problems });
     } catch (err) {
       console.error('Error fetching problems:', err);
@@ -116,21 +115,20 @@ const server = http.createServer(async (req, res) => {
       const body = await parseBody(req);
       const locationNote = body.location_note || '';
 
-      const check = db.prepare('SELECT id, title FROM problems WHERE id = ?').get(problemId);
-      if (!check) {
+      const { rows: check } = await pool.query('SELECT id, title FROM problems WHERE id = $1', [problemId]);
+      if (check.length === 0) {
         return sendJSON(res, 404, { success: false, error: 'Problem not found' });
       }
 
-      const insertStmt = db.prepare('INSERT INTO reports (problem_id, location_note) VALUES (?, ?)');
-      insertStmt.run(problemId, locationNote);
+      await pool.query('INSERT INTO reports (problem_id, location_note) VALUES ($1, $2)', [problemId, locationNote]);
 
-      const countRow = db.prepare('SELECT COUNT(*) as count FROM reports WHERE problem_id = ?').get(problemId);
+      const { rows: countRows } = await pool.query('SELECT COUNT(*) as count FROM reports WHERE problem_id = $1', [problemId]);
 
       return sendJSON(res, 200, {
         success: true,
         message: 'Report logged successfully',
         problem_id: problemId,
-        new_count: countRow.count
+        new_count: parseInt(countRows[0].count, 10)
       });
     } catch (err) {
       console.error('Error adding report:', err);
@@ -149,16 +147,14 @@ const server = http.createServer(async (req, res) => {
         return sendJSON(res, 400, { success: false, error: 'Story text cannot be empty' });
       }
 
-      const insertStmt = db.prepare(`
-        INSERT INTO stories (problem_id, story_text, impact_tag, author_alias)
-        VALUES (?, ?, ?, ?)
-      `);
-
-      insertStmt.run(
-        problemId,
-        body.story_text.trim(),
-        body.impact_tag || 'General Impact',
-        body.author_alias && body.author_alias.trim() ? body.author_alias.trim() : 'Anonymous Student'
+      await pool.query(
+        'INSERT INTO stories (problem_id, story_text, impact_tag, author_alias) VALUES ($1, $2, $3, $4)',
+        [
+          problemId,
+          body.story_text.trim(),
+          body.impact_tag || 'General Impact',
+          body.author_alias && body.author_alias.trim() ? body.author_alias.trim() : 'Anonymous Student'
+        ]
       );
 
       return sendJSON(res, 201, {
@@ -185,20 +181,18 @@ const server = http.createServer(async (req, res) => {
       const description = body.description && body.description.trim() ? body.description.trim() : 'Problem reported by campus community member.';
       const icon = body.icon && body.icon.trim() ? body.icon.trim() : '⚠️';
 
-      const insertStmt = db.prepare(`
-        INSERT INTO problems (slug, title, category, description, icon, is_core, created_at)
-        VALUES (?, ?, ?, ?, ?, 0, CURRENT_TIMESTAMP)
-      `);
-      insertStmt.run(slug, title, category, description, icon);
+      const { rows: newProb } = await pool.query(
+        'INSERT INTO problems (slug, title, category, description, icon, is_core) VALUES ($1, $2, $3, $4, $5, 0) RETURNING id',
+        [slug, title, category, description, icon]
+      );
 
-      // Also log an initial report from the person who created it
-      const newProb = db.prepare('SELECT id FROM problems WHERE slug = ?').get(slug);
-      db.prepare('INSERT INTO reports (problem_id) VALUES (?)').run(newProb.id);
+      // Log an initial report from the creator
+      await pool.query('INSERT INTO reports (problem_id) VALUES ($1)', [newProb[0].id]);
 
       return sendJSON(res, 201, {
         success: true,
         message: 'New problem added to the campus barrier map',
-        problem: { id: newProb.id, slug, title, category, description, icon, report_count: 1 }
+        problem: { id: newProb[0].id, slug, title, category, description, icon, report_count: 1 }
       });
     } catch (err) {
       console.error('Error creating new problem:', err);
@@ -209,8 +203,8 @@ const server = http.createServer(async (req, res) => {
   // GET /api/stories - List all stories
   if (method === 'GET' && pathname === '/api/stories') {
     try {
-      const stmt = db.prepare(`
-        SELECT 
+      const { rows: stories } = await pool.query(`
+        SELECT
           s.id,
           s.problem_id,
           p.title AS problem_title,
@@ -223,14 +217,13 @@ const server = http.createServer(async (req, res) => {
         JOIN problems p ON s.problem_id = p.id
         ORDER BY s.created_at DESC
       `);
-      const stories = stmt.all();
       return sendJSON(res, 200, { success: true, stories });
     } catch (err) {
       return sendJSON(res, 500, { success: false, error: err.message });
     }
   }
 
-  // POST /api/problems/:id/status - Update problem status (Active / In Progress / Resolved)
+  // POST /api/problems/:id/status - Update problem status
   const statusMatch = pathname.match(/^\/api\/problems\/(\d+)\/status$/);
   if (method === 'POST' && statusMatch) {
     try {
@@ -238,54 +231,52 @@ const server = http.createServer(async (req, res) => {
       const body = await parseBody(req);
       const newStatus = body.status || 'active';
 
-      db.prepare('UPDATE problems SET status = ? WHERE id = ?').run(newStatus, problemId);
+      await pool.query('UPDATE problems SET status = $1 WHERE id = $2', [newStatus, problemId]);
       return sendJSON(res, 200, { success: true, message: 'Status updated', status: newStatus });
     } catch (err) {
       return sendJSON(res, 500, { success: false, error: err.message });
     }
   }
 
-  // DELETE /api/stories/:id - Admin moderation of stories
+  // DELETE /api/stories/:id - Admin moderation
   const deleteStoryMatch = pathname.match(/^\/api\/stories\/(\d+)$/);
   if (method === 'DELETE' && deleteStoryMatch) {
     try {
       const storyId = parseInt(deleteStoryMatch[1], 10);
-      db.prepare('DELETE FROM stories WHERE id = ?').run(storyId);
+      await pool.query('DELETE FROM stories WHERE id = $1', [storyId]);
       return sendJSON(res, 200, { success: true, message: 'Story deleted' });
     } catch (err) {
       return sendJSON(res, 500, { success: false, error: err.message });
     }
   }
 
-  // GET /api/stats - Executive statistics for Administration
+  // GET /api/stats - Executive statistics
   if (method === 'GET' && pathname === '/api/stats') {
     try {
-      const totalReports = db.prepare('SELECT COUNT(*) as count FROM reports').get().count;
-      const totalStories = db.prepare('SELECT COUNT(*) as count FROM stories').get().count;
-      const totalProblems = db.prepare('SELECT COUNT(*) as count FROM problems').get().count;
-      
-      // Calculate unresolved rate ONLY for problems that have received real student reports
+      const { rows: [{ count: totalReports }] } = await pool.query('SELECT COUNT(*) as count FROM reports');
+      const { rows: [{ count: totalStories }] } = await pool.query('SELECT COUNT(*) as count FROM stories');
+      const { rows: [{ count: totalProblems }] } = await pool.query('SELECT COUNT(*) as count FROM problems');
+
       let unresolvedRate = '0%';
       let unresolvedNote = 'No student reports pending';
-      
-      if (totalReports > 0) {
-        const reportedBarriers = db.prepare(`
-          SELECT 
+
+      if (parseInt(totalReports, 10) > 0) {
+        const { rows: [rb] } = await pool.query(`
+          SELECT
             COUNT(DISTINCT p.id) as total_flagged,
             SUM(CASE WHEN p.status != 'resolved' THEN 1 ELSE 0 END) as still_unresolved
           FROM problems p
           JOIN reports r ON p.id = r.problem_id
-        `).get();
-
-        if (reportedBarriers.total_flagged > 0) {
-          const rateNum = Math.round((reportedBarriers.still_unresolved / reportedBarriers.total_flagged) * 100);
+        `);
+        if (parseInt(rb.total_flagged, 10) > 0) {
+          const rateNum = Math.round((parseInt(rb.still_unresolved, 10) / parseInt(rb.total_flagged, 10)) * 100);
           unresolvedRate = rateNum + '%';
-          unresolvedNote = `${reportedBarriers.still_unresolved} of ${reportedBarriers.total_flagged} reported spots unresolved`;
+          unresolvedNote = `${rb.still_unresolved} of ${rb.total_flagged} reported spots unresolved`;
         }
       }
 
-      const breakdown = db.prepare(`
-        SELECT 
+      const { rows: breakdown } = await pool.query(`
+        SELECT
           p.id,
           p.title,
           p.icon,
@@ -294,44 +285,42 @@ const server = http.createServer(async (req, res) => {
           p.status,
           COUNT(r.id) as reports,
           MIN(r.created_at) as first_reported_at,
-          CASE 
+          CASE
             WHEN COUNT(r.id) = 0 THEN 0
-            ELSE MAX(1, CAST((julianday('now') - julianday(MIN(r.created_at))) AS INTEGER) + 1)
+            ELSE GREATEST(1, EXTRACT(DAY FROM NOW() - MIN(r.created_at))::INTEGER + 1)
           END AS days_unresolved
         FROM problems p
         LEFT JOIN reports r ON p.id = r.problem_id
         GROUP BY p.id
         ORDER BY reports DESC
-      `).all();
+      `);
 
-      // Category breakdown
-      const categoryStats = db.prepare(`
-        SELECT 
+      const { rows: categoryStats } = await pool.query(`
+        SELECT
           p.category,
           COUNT(r.id) as reports
         FROM problems p
         LEFT JOIN reports r ON p.id = r.problem_id
         GROUP BY p.category
         ORDER BY reports DESC
-      `).all();
+      `);
 
-      // Recent 7 days trend
-      const dailyTrend = db.prepare(`
-        SELECT 
-          date(created_at) as report_date,
+      const { rows: dailyTrend } = await pool.query(`
+        SELECT
+          DATE(created_at) as report_date,
           COUNT(*) as daily_count
         FROM reports
-        GROUP BY date(created_at)
+        GROUP BY DATE(created_at)
         ORDER BY report_date DESC
         LIMIT 10
-      `).all();
+      `);
 
       return sendJSON(res, 200, {
         success: true,
         summary: {
-          total_reports: totalReports,
-          total_stories: totalStories,
-          total_problems: totalProblems,
+          total_reports: parseInt(totalReports, 10),
+          total_stories: parseInt(totalStories, 10),
+          total_problems: parseInt(totalProblems, 10),
           unresolved_rate: unresolvedRate,
           unresolved_note: unresolvedNote
         },
@@ -344,26 +333,26 @@ const server = http.createServer(async (req, res) => {
     }
   }
 
-  // GET /api/export-csv - Downloadable CSV for Administrative meetings
+  // GET /api/export-csv - Downloadable CSV
   if (method === 'GET' && pathname === '/api/export-csv') {
     try {
-      const rows = db.prepare(`
-        SELECT 
-          p.id AS Problem_ID,
-          p.title AS Barrier_Title,
-          p.category AS Category,
-          p.is_core AS Is_Core_Problem,
-          COALESCE(MIN(r.created_at), 'Not yet reported') AS First_Flagged_Date,
-          COUNT(r.id) AS Total_Affected_Students,
-          CASE 
+      const { rows } = await pool.query(`
+        SELECT
+          p.id AS "Problem_ID",
+          p.title AS "Barrier_Title",
+          p.category AS "Category",
+          p.is_core AS "Is_Core_Problem",
+          COALESCE(MIN(r.created_at)::TEXT, 'Not yet reported') AS "First_Flagged_Date",
+          COUNT(r.id) AS "Total_Affected_Students",
+          CASE
             WHEN COUNT(r.id) = 0 THEN 0
-            ELSE MAX(1, CAST((julianday('now') - julianday(MIN(r.created_at))) AS INTEGER) + 1)
-          END AS Days_Active
+            ELSE GREATEST(1, EXTRACT(DAY FROM NOW() - MIN(r.created_at))::INTEGER + 1)
+          END AS "Days_Active"
         FROM problems p
         LEFT JOIN reports r ON p.id = r.problem_id
         GROUP BY p.id
-        ORDER BY Total_Affected_Students DESC
-      `).all();
+        ORDER BY "Total_Affected_Students" DESC
+      `);
 
       let csv = 'Problem_ID,Barrier_Title,Category,Is_Core_Problem,First_Flagged_Date,Total_Affected_Students,Days_Active\n';
       rows.forEach(r => {
@@ -385,7 +374,6 @@ const server = http.createServer(async (req, res) => {
   // -------------------------------------------------------------
   let filePath = path.join(PUBLIC_DIR, pathname === '/' ? 'index.html' : pathname);
 
-  // If URL doesn't have an extension, try appending .html
   if (!path.extname(filePath)) {
     if (fs.existsSync(filePath + '.html')) {
       filePath = filePath + '.html';
@@ -396,7 +384,6 @@ const server = http.createServer(async (req, res) => {
 
   fs.stat(filePath, (err, stats) => {
     if (err || !stats.isFile()) {
-      // 404 fallback
       res.writeHead(404, { 'Content-Type': 'text/html; charset=utf-8' });
       res.end(`
         <!DOCTYPE html>
@@ -420,6 +407,14 @@ const server = http.createServer(async (req, res) => {
   });
 });
 
-server.listen(PORT, () => {
-  console.log(`Scan The Barrier Website running on http://localhost:${PORT}`);
-});
+// Initialize DB then start server
+initDB()
+  .then(() => {
+    server.listen(PORT, () => {
+      console.log(`Scan The Barrier Website running on http://localhost:${PORT}`);
+    });
+  })
+  .catch(err => {
+    console.error('❌ Failed to initialize database:', err);
+    process.exit(1);
+  });
