@@ -76,8 +76,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Update Top Ticker Stats
   function updateTickers(problems) {
-    const totalReports = problems.reduce((sum, p) => sum + (p.report_count || 0), 0);
-    const totalStories = problems.reduce((sum, p) => sum + (p.story_count || 0), 0);
+    const totalReports = problems.reduce((sum, p) => sum + (parseInt(p.report_count, 10) || 0), 0);
+    const totalStories = problems.reduce((sum, p) => sum + (parseInt(p.story_count, 10) || 0), 0);
 
     if (totalReportsTicker) totalReportsTicker.textContent = totalReports;
     if (totalStoriesTicker) totalStoriesTicker.textContent = totalStories;
