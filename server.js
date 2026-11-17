@@ -2,6 +2,7 @@ const http = require('node:http');
 const fs = require('node:fs');
 const path = require('node:path');
 const url = require('node:url');
+const crypto = require('node:crypto');
 const { pool, initDB } = require('./db.js');
 
 const PORT = process.env.PORT || 3000;
@@ -114,13 +115,38 @@ const server = http.createServer(async (req, res) => {
       const problemId = parseInt(reportMatch[1], 10);
       const body = await parseBody(req);
       const locationNote = body.location_note || '';
+      const voterToken = body.voter_token;
 
       const { rows: check } = await pool.query('SELECT id, title FROM problems WHERE id = $1', [problemId]);
       if (check.length === 0) {
         return sendJSON(res, 404, { success: false, error: 'Problem not found' });
       }
 
-      await pool.query('INSERT INTO reports (problem_id, location_note) VALUES ($1, $2)', [problemId, locationNote]);
+      let voterHash = null;
+      if (voterToken && typeof voterToken === 'string') {
+        voterHash = crypto.createHash('sha256').update(voterToken + '-barrier-salt').digest('hex');
+
+        // Check if this anonymous student has already reported this problem
+        const { rows: existing } = await pool.query(
+          'SELECT id FROM reports WHERE problem_id = $1 AND voter_hash = $2',
+          [problemId, voterHash]
+        );
+        if (existing.length > 0) {
+          const { rows: countRows } = await pool.query('SELECT COUNT(*) as count FROM reports WHERE problem_id = $1', [problemId]);
+          return sendJSON(res, 200, {
+            success: false,
+            already_reported: true,
+            message: 'You have already counted your voice for this barrier!',
+            problem_id: problemId,
+            new_count: parseInt(countRows[0].count, 10)
+          });
+        }
+      }
+
+      await pool.query(
+        'INSERT INTO reports (problem_id, location_note, voter_hash) VALUES ($1, $2, $3)',
+        [problemId, locationNote, voterHash]
+      );
 
       const { rows: countRows } = await pool.query('SELECT COUNT(*) as count FROM reports WHERE problem_id = $1', [problemId]);
 
@@ -187,7 +213,11 @@ const server = http.createServer(async (req, res) => {
       );
 
       // Log an initial report from the creator
-      await pool.query('INSERT INTO reports (problem_id) VALUES ($1)', [newProb[0].id]);
+      let voterHash = null;
+      if (body.voter_token && typeof body.voter_token === 'string') {
+        voterHash = crypto.createHash('sha256').update(body.voter_token + '-barrier-salt').digest('hex');
+      }
+      await pool.query('INSERT INTO reports (problem_id, voter_hash) VALUES ($1, $2)', [newProb[0].id, voterHash]);
 
       return sendJSON(res, 201, {
         success: true,

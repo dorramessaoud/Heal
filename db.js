@@ -26,8 +26,11 @@ async function initDB() {
         id SERIAL PRIMARY KEY,
         problem_id INTEGER NOT NULL REFERENCES problems(id),
         created_at TIMESTAMPTZ DEFAULT NOW(),
-        location_note TEXT
+        location_note TEXT,
+        voter_hash TEXT
       );
+
+      ALTER TABLE reports ADD COLUMN IF NOT EXISTS voter_hash TEXT;
 
       CREATE TABLE IF NOT EXISTS stories (
         id SERIAL PRIMARY KEY,

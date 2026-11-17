@@ -355,7 +355,17 @@ main.container {
   transform: scale(0.97);
 }
 
-.btn-report.reported {
+.btn-report.reported,
+.btn-report:disabled {
+  background: #047857;
+  cursor: default;
+  opacity: 0.92;
+  box-shadow: 0 2px 8px rgba(4, 120, 87, 0.4);
+}
+
+.btn-report.reported:hover,
+.btn-report:disabled:hover {
+  transform: none;
   background: #047857;
   box-shadow: 0 2px 8px rgba(4, 120, 87, 0.4);
 }

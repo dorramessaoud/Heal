@@ -28,6 +28,16 @@ document.addEventListener('DOMContentLoaded', () => {
   // Cache of problems
   let problemsList = [];
 
+  // Anonymous voter token (stored in student's browser, completely anonymous)
+  function getVoterToken() {
+    let token = localStorage.getItem('heal_voter_token');
+    if (!token) {
+      token = 'voter_' + Math.random().toString(36).slice(2) + Date.now().toString(36);
+      localStorage.setItem('heal_voter_token', token);
+    }
+    return token;
+  }
+
   // Local storage tracker for reported items
   function getReportedMap() {
     try {
@@ -76,8 +86,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Update Top Ticker Stats
   function updateTickers(problems) {
-    const totalReports = problems.reduce((sum, p) => sum + (p.report_count || 0), 0);
-    const totalStories = problems.reduce((sum, p) => sum + (p.story_count || 0), 0);
+    const totalReports = problems.reduce((sum, p) => sum + (parseInt(p.report_count, 10) || 0), 0);
+    const totalStories = problems.reduce((sum, p) => sum + (parseInt(p.story_count, 10) || 0), 0);
 
     if (totalReportsTicker) totalReportsTicker.textContent = totalReports;
     if (totalStoriesTicker) totalStoriesTicker.textContent = totalStories;
@@ -89,7 +99,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const reportedMap = getReportedMap();
 
     problemsContainer.innerHTML = problems.map(p => {
-      const isReported = (p.report_count > 0) && !!reportedMap[p.id];
+      const isReported = !!reportedMap[p.id];
 
       return `
         <article class="problem-card" data-id="${p.id}">
@@ -117,7 +127,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 class="btn-report ${isReported ? 'reported' : ''}" 
                 data-id="${p.id}" 
                 id="btn-report-${p.id}"
-                title="Tap to count your voice without writing anything"
+                ${isReported ? 'disabled' : ''}
+                title="${isReported ? 'You have already counted your voice for this barrier' : 'Tap to count your voice without writing anything'}"
               >
                 <span>${isReported ? '✓ Counted (+1)' : '+1 My Voice'}</span>
               </button>
@@ -131,6 +142,10 @@ document.addEventListener('DOMContentLoaded', () => {
     document.querySelectorAll('.btn-report').forEach(btn => {
       btn.addEventListener('click', async (e) => {
         const id = btn.getAttribute('data-id');
+        if (btn.disabled || btn.classList.contains('reported')) {
+          showToast('You have already counted your voice for this barrier!', 'ℹ️');
+          return;
+        }
         await handleOneClickReport(id, btn);
       });
     });
@@ -158,6 +173,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Handle Instant 1-Click Report
   async function handleOneClickReport(problemId, buttonEl) {
+    const reportedMap = getReportedMap();
+    if (reportedMap[problemId]) {
+      showToast('You have already counted your voice for this barrier!', 'ℹ️');
+      buttonEl.disabled = true;
+      buttonEl.classList.add('reported');
+      buttonEl.innerHTML = '<span>✓ Counted (+1)</span>';
+      return;
+    }
+
     const counterEl = document.getElementById(`counter-${problemId}`);
     const originalText = counterEl ? counterEl.textContent : '0';
 
@@ -172,6 +196,7 @@ document.addEventListener('DOMContentLoaded', () => {
       }, 200);
     }
 
+    buttonEl.disabled = true;
     buttonEl.classList.add('reported');
     buttonEl.innerHTML = '<span>✓ Counted (+1)</span>';
 
@@ -179,7 +204,10 @@ document.addEventListener('DOMContentLoaded', () => {
       const res = await fetch(`/api/problems/${problemId}/report`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ location_note: 'One-click student tap' })
+        body: JSON.stringify({ 
+          location_note: 'One-click student tap',
+          voter_token: getVoterToken()
+        })
       });
       const data = await res.json();
 
@@ -188,11 +216,24 @@ document.addEventListener('DOMContentLoaded', () => {
         showToast('Your voice was counted! Total affected: ' + data.new_count, '🎉');
         if (counterEl) counterEl.textContent = data.new_count;
         loadProblems(); // refresh ticker
+      } else if (data.already_reported) {
+        markAsReportedLocally(problemId);
+        if (counterEl) counterEl.textContent = data.new_count || originalText;
+        showToast('You have already counted your voice for this barrier!', 'ℹ️');
+        loadProblems();
       } else {
-        showToast('Error recording tap: ' + data.error, '⚠️');
+        buttonEl.disabled = false;
+        buttonEl.classList.remove('reported');
+        buttonEl.innerHTML = '<span>+1 My Voice</span>';
+        if (counterEl) counterEl.textContent = originalText;
+        showToast('Error recording tap: ' + (data.error || 'Please try again'), '⚠️');
       }
     } catch (err) {
       console.error(err);
+      buttonEl.disabled = false;
+      buttonEl.classList.remove('reported');
+      buttonEl.innerHTML = '<span>+1 My Voice</span>';
+      if (counterEl) counterEl.textContent = originalText;
       showToast('Network error logging report', '⚠️');
     }
   }
@@ -288,7 +329,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const res = await fetch('/api/problems', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ title, category, icon, description })
+          body: JSON.stringify({ title, category, icon, description, voter_token: getVoterToken() })
         });
         const data = await res.json();
         if (data.success) {
